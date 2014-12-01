@@ -1,6 +1,8 @@
 module Rock
     # Context object used to evaluate the blocks given to in_flavor and only_in_flavor
     class InFlavorContext < BasicObject
+        # @return [FlavorManager] the underlying flavor manager
+        attr_reader :flavor_manager
         # @return [String] the name of the currently selected flavor
         attr_reader :current_flavor_name
         # @return [Array<String>] the set of flavors the context is made of
@@ -11,9 +13,9 @@ module Rock
         #   only if the current flavor is included in {flavors} (true)
         attr_reader :strict
 
-        def initialize(current_flavor_name, flavors, strict)
-            @current_flavor_name, @flavors, @strict =
-                current_flavor_name, flavors, strict
+        def initialize(flavor_manager, current_flavor_name, flavors, strict)
+            @flavor_manager, @current_flavor_name, @flavors, @strict =
+                flavor_manager, current_flavor_name, flavors, strict
         end
 
         def method_missing(m, *args, &block)
@@ -21,12 +23,12 @@ module Rock
             if m.to_s =~ /^\w+_package$/
                 package_name = args.first
 
-                manifest = ::Autoproj.manifest
+                manifest = flavor_manager.manifest
                 package_set =
                     if manifest.package(package_name)
                         manifest.definition_package_set(package_name)
                     else 
-                        ::Autoproj.current_package_set
+                        flavor_manager.setup.current_package_set
                     end
                 vcs = manifest.importer_definition_for(package_name, package_set)
                 if (!vcs)

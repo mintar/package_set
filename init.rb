@@ -90,11 +90,11 @@ def package_in_flavor?(pkg, flavor_name)
 end
 
 def add_packages_to_flavors(mappings)
-    Rock.flavors.add_packages_to_flavors(Autoproj.current_package_set, mappings)
+    Rock.flavors.add_packages_to_flavors(Rock.flavors.setup.current_package_set, mappings)
 end
 
 def remove_packages_from_flavors(mappings)
-    Rock.flavors.remove_packages_from_flavors(Autoproj.current_package_set, mappings)
+    Rock.flavors.remove_packages_from_flavors(Rock.flavors.setup.current_package_set, mappings)
 end
 
 # Defines a bundle package in the installation

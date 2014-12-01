@@ -13,7 +13,19 @@ module Rock
         # @return [FlavorDefinition]
         attr_reader :current_flavor
 
-        def initialize
+        # Autoproj's setup object
+        #
+        # @return [#current_package_set]
+        attr_reader :setup
+
+        # The manifest we're working on
+        #
+        # @return [Autoproj::Manifest]
+        attr_reader :manifest
+
+        def initialize(setup, manifest = setup.manifest)
+            @setup = setup
+            @manifest = manifest
             @flavors = Hash.new
             @package_sets = Set.new
         end
@@ -49,7 +61,7 @@ module Rock
             end
 
             if flavor_def.implicit?
-                pkg_set = Autoproj.manifest.definition_source(pkg)
+                pkg_set = manifest.definition_source(pkg)
                 if package_sets.include?(pkg_set)
                     !flavor_def.removed?(pkg)
                 else
@@ -105,12 +117,12 @@ module Rock
 
             flavor = current_flavor
 
-            current_packages = Autoproj.manifest.packages.keys
-            InFlavorContext.new(flavor.name, flavors, options[:strict]).
+            current_packages = manifest.packages.keys
+            InFlavorContext.new(self, flavor.name, flavors, options[:strict]).
                 instance_eval(&block)
 
-            new_packages = Autoproj.manifest.packages.keys - current_packages
-            add_packages_to_flavors Autoproj.current_package_set, flavors => new_packages
+            new_packages = manifest.all_package_names - current_packages
+            add_packages_to_flavors setup.current_package_set, flavors => new_packages
         end
 
         # Registers the given package set as being flavored
@@ -171,7 +183,7 @@ module Rock
         # set of default packages (mainly if it is implicit)
         def finalize
             package_sets.each do |pkg_set|
-                meta = Autoproj.manifest.metapackages[pkg_set.name]
+                meta = manifest.metapackages[pkg_set.name]
 
                 if current_flavor.implicit?
                     in_a_flavor = flavors.values.inject(Set.new) do |pkgs, other_flavor| 
@@ -197,7 +209,7 @@ module Rock
         # packages to the given default branch
         def reset_invalid_branches_to(default_branch = 'master')
             switched_packages = Array.new
-            Autoproj.manifest.each_package_definition do |pkg_def|
+            manifest.each_package_definition do |pkg_def|
                 pkg = pkg_def.autobuild
                 next if !pkg.importer.kind_of?(Autobuild::Git)
                 next if pkg.importer.branch == default_branch
@@ -219,7 +231,7 @@ module Rock
         # flavor's branch, but are actually on a different one
         def find_all_overriden_flavored_branches
             wrong_branch = Array.new
-            Autoproj.manifest.each_package_definition do |pkg_def|
+            manifest.each_package_definition do |pkg_def|
                 pkg = pkg_def.autobuild
                 next if !pkg.importer.kind_of?(Autobuild::Git)
 
@@ -262,7 +274,16 @@ module Rock
     end
 
     def self.flavors
-        @flavors ||= FlavorManager.new
+        if @flavors
+            return @flavors
+        end
+
+        @flavors =
+            if Autoproj.respond_to?(:setup)
+                FlavorManager.new(Autoproj.setup)
+            else
+                FlavorManager.new(Autoproj, Autoproj.manifest)
+            end
     end
 end
 
